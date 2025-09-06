@@ -280,9 +280,9 @@ mobSpawner = {
                     term.write("Forced Off")
                 end
             else
-                paintutils.drawLine(2, 6, 12, 6, colors.lightGray)
+                paintutils.drawLine(2, 6, 12, 6, colors.gray)
                 term.setCursorPos(5, 6)
-                term.setTextColor(colors.black)
+                term.setTextColor(colors.white)
                 term.write("Auto")
             end
 
@@ -359,6 +359,7 @@ mobSpawner = {
                             mobSpawner.uiState.cursorPos         = math.max(math.min(eventData[3], #mobSpawner.uiState.curText + 1) - 1, 0)
                             mobSpawner.uiState.viewPos           = 0
                         end
+                        term.setCursorBlink(true)
                         term.setCursorPos(1 + mobSpawner.uiState.cursorPos - mobSpawner.uiState.viewPos, 2)
                     elseif eventData[4] == 5 then
                         if mobSpawner.uiState.selectedTextField == "channel" then
@@ -369,6 +370,7 @@ mobSpawner = {
                             mobSpawner.uiState.cursorPos         = math.max(math.min(eventData[3], #mobSpawner.uiState.curText + 1) - 1, 0)
                             mobSpawner.uiState.viewPos           = 0
                         end
+                        term.setCursorBlink(true)
                         term.setCursorPos(1 + mobSpawner.uiState.cursorPos - mobSpawner.uiState.viewPos, 5)
                     else
                         submit = mobSpawner.uiState.selectedTextField ~= nil
@@ -422,16 +424,28 @@ mobSpawner = {
                 mobSpawner.uiState.curText = string.sub(mobSpawner.uiState.curText, 1, mobSpawner.uiState.cursorPos) .. string.sub(mobSpawner.uiState.curText, 2 + mobSpawner.uiState.cursorPos, -1)
                 redrawTextfield = true
             elseif eventData[2] == keys.left then
-                mobSpawner.uiState.cursorPos = mobSpawner.uiState.cursorPos - 1
-                if mobSpawner.uiState.cursorPos < mobSpawner.uiState.viewPos then
-                    mobSpawner.uiState.viewPos = mobSpawner.uiState.cursorPos
+                if mobSpawner.uiState.cursorPos > 0 then
+                    mobSpawner.uiState.cursorPos = mobSpawner.uiState.cursorPos - 1
+                    if mobSpawner.uiState.cursorPos < mobSpawner.uiState.viewPos then
+                        mobSpawner.uiState.viewPos = mobSpawner.uiState.cursorPos
+                    end
+                    redrawTextfield = true
                 end
-                redrawTextfield = true
             elseif eventData[2] == keys.right then
-                mobSpawner.uiState.cursorPos = mobSpawner.uiState.cursorPos + 1
-                if mobSpawner.uiState.cursorPos - mobSpawner.uiState.viewPos > 15 then
-                    mobSpawner.uiState.viewPos = mobSpawner.uiState.cursorPos - 15
+                if mobSpawner.uiState.cursorPos < #mobSpawner.uiState.curText + 1 then
+                    mobSpawner.uiState.cursorPos = mobSpawner.uiState.cursorPos + 1
+                    if mobSpawner.uiState.cursorPos - mobSpawner.uiState.viewPos > 15 then
+                        mobSpawner.uiState.viewPos = mobSpawner.uiState.cursorPos - 15
+                    end
+                    redrawTextfield = true
                 end
+            elseif eventData[2] == keys.home then
+                mobSpawner.uiState.cursorPos = 0
+                mobSpawner.uiState.viewPos   = 0
+                redrawTextfield = true
+            elseif eventData[2] == keys["end"] then
+                mobSpawner.uiState.cursorPos = #mobSpawner.uiState.curText + 1
+                mobSpawner.uiState.viewPos   = math.max(mobSpawner.uiState.cursorPos - 15, 0)
                 redrawTextfield = true
             elseif eventData[2] == keys.enter then
                 if mobSpawner.uiState.selectedTextField == "playername" then
