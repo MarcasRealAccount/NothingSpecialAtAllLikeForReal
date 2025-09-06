@@ -1,4 +1,4 @@
-local modem = peripheral.wrap("modem")
+local modem = peripheral.find("modem")
 
 local progSettings = {
     listenChannel     = 77,
@@ -63,10 +63,6 @@ mobSpawner = {
     },
 
     sendCommand = function(command)
-        if not mobSpawner.uiState.alive then
-            return nil, nil
-        end
-
         modem.transmit(progSettings.mobSpawnerChannel, progSettings.listenChannel, command)
         local timeoutTimerID = os.createTimer(0.5)
         while true do
@@ -80,7 +76,15 @@ mobSpawner = {
             table.insert(progState.unhandledEvents, eventData)
         end
     end,
+    ping = function()
+        local replyChannel, message = mobSpawner.sendCommand("ping")
+        return message == "pong"
+    end,
     getState = function()
+        if not mobSpawner.uiState.alive then
+            return nil, nil
+        end
+
         local replyChannel, message = mobSpawner.sendCommand("getState")
         local recState = textutils.unserialize(message)
         mobSpawner.state.playerOnline = recState.playerOnline or mobSpawner.state.playerOnline
@@ -88,6 +92,10 @@ mobSpawner = {
         return true
     end,
     getSettings = function()
+        if not mobSpawner.uiState.alive then
+            return nil, nil
+        end
+
         local replyChannel, message = mobSpawner.sendCommand("getSettings")
         local recSettings = texutils.unserialize(message)
         mobSpawner.settings.playerName = recState.playerName or mobSpawner.settings.playerName
@@ -96,6 +104,10 @@ mobSpawner = {
         return true
     end,
     setPlayerName = function(newPlayerName)
+        if not mobSpawner.uiState.alive then
+            return nil, nil
+        end
+
         local replyChannel, message = mobSpawner.sendCommand(string.format("setPlayerName:%s", newPlayerName))
         if message == "changed" then
             mobSpawner.settings.playerName = newPlayerName
@@ -104,6 +116,10 @@ mobSpawner = {
         return false
     end,
     setChannel = function(newChannel)
+        if not mobSpawner.uiState.alive then
+            return nil, nil
+        end
+        
         local replyChannel, message = mobSpawner.sendCommand(string.format("setChannel:%d", newChannel))
         if message == "changed" then
             progSettings.mobSpawnerChannel = newChannel
@@ -113,6 +129,10 @@ mobSpawner = {
         return false
     end,
     forceEnable = function()
+        if not mobSpawner.uiState.alive then
+            return nil, nil
+        end
+        
         local replyChannel, message = mobSpawner.sendCommand("enable")
         if message == "enabled" then
             mobSpawner.settings.forced  = true
@@ -122,6 +142,10 @@ mobSpawner = {
         return false
     end,
     forceDisabled = function()
+        if not mobSpawner.uiState.alive then
+            return nil, nil
+        end
+        
         local replyChannel, message = mobSpawner.sendCommand("disable")
         if message == "disabled" then
             mobSpawner.settings.forced  = true
@@ -131,6 +155,10 @@ mobSpawner = {
         return false
     end,
     unforce = function()
+        if not mobSpawner.uiState.alive then
+            return nil, nil
+        end
+        
         local replyChannel, message = mobSpawner.sendCommand("unforce")
         if message == "enabled" or message == "disabled" then
             mobSpawner.settings.forced  = false
@@ -155,6 +183,16 @@ mobSpawner = {
         term.write(string.sub(text, viewPos + 1, viewPos + 15))
     end,
     onStart = function()
+        local isOpen = mobSpawner.ping()
+        if isOpen then
+            mobSpawnerAlive = true
+            getState()
+            getSettings()
+            progState.repaint = true
+        else
+            mobSpawnerAlive   = false
+            progState.repaint = true
+        end
         mobSpawner.uiState.requestTimerID = os.startTimer(1)
     end,
     onEnd = function()
@@ -198,7 +236,7 @@ mobSpawner = {
             if mobSpawner.uiState.selectedTextField == "channel" then
                 mobSpawner.drawTextfield(5, mobSpawner.uiState.curText, mobSpawner.uiState.viewPos)
             else
-                mobSpawner.drawTextfield(5, tostring(mobSpawner.settings.listenChannel), 0)
+                mobSpawner.drawTextfield(5, tostring(progSettings.mobSpawnerChannel), 0)
             end
 
             if mobSpawner.uiState.selectedTextField == "playername" then
@@ -264,7 +302,7 @@ mobSpawner = {
     onEvent = function(event, eventData)
         if event == "timer" then
             if eventData[2] == mobSpawner.uiState.requestTimerID then
-                local isOpen = modem.isOpen(progSettings.mobSpawnerChannel)
+                local isOpen = mobSpawner.ping()
                 if isOpen then
                     mobSpawnerAlive = true
                     getState()
@@ -281,7 +319,7 @@ mobSpawner = {
 
             -- Settings button
             if eventData[3] >= 17 and eventData[3] <= 26 and eventData[4] >= 1 and eventData[4] <= 3 then
-                mobSpawner.uiState.inSettings = ~mobSpawner.uiState.inSettings
+                mobSpawner.uiState.inSettings = not mobSpawner.uiState.inSettings
                 progState.repaint = true
             elseif not mobSpawner.uiState.inSettings then
                 if eventData[3] >= 1 and eventData[3] <= 13 and eventData[4] >= 5 and eventData[4] <= 7 then
@@ -313,7 +351,7 @@ mobSpawner = {
                             mobSpawner.uiState.cursorPos = mobSpawner.uiState.viewPos + math.max(math.min(eventData[3], #mobSpawner.uiState.curText) - 1, 0)
                         else
                             mobSpawner.uiState.selectedTextField = "channel"
-                            mobSpawner.uiState.curText           = tostring(mobSpawner.settings.listenChannel)
+                            mobSpawner.uiState.curText           = tostring(progSettings.mobSpawnerChannel)
                             mobSpawner.uiState.cursorPos         = math.max(math.min(eventData[3], #mobSpawner.uiState.curText) - 1, 0)
                             mobSpawner.uiState.viewPos           = 0
                         end
