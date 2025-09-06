@@ -64,7 +64,7 @@ mobSpawner = {
 
     sendCommand = function(command)
         modem.transmit(progSettings.mobSpawnerChannel, progSettings.listenChannel, command)
-        local timeoutTimerID = os.createTimer(0.5)
+        local timeoutTimerID = os.startTimer(0.5)
         while true do
             local eventData = { os.pullEvent() }
             if eventData[1] == "modem_message" and eventData[3] == progSettings.listenChannel then
@@ -97,10 +97,10 @@ mobSpawner = {
         end
 
         local replyChannel, message = mobSpawner.sendCommand("getSettings")
-        local recSettings = texutils.unserialize(message)
-        mobSpawner.settings.playerName = recState.playerName or mobSpawner.settings.playerName
-        mobSpawner.settings.forced     = recState.forced     or mobSpawner.settings.forced
-        mobSpawner.settings.enabled    = recState.enabled    or mobSpawner.settings.enabled
+        local recSettings = textutils.unserialize(message)
+        mobSpawner.settings.playerName = recSettings.playerName or mobSpawner.settings.playerName
+        mobSpawner.settings.forced     = recSettings.forced     or mobSpawner.settings.forced
+        mobSpawner.settings.enabled    = recSettings.enabled    or mobSpawner.settings.enabled
         return true
     end,
     setPlayerName = function(newPlayerName)
@@ -141,7 +141,7 @@ mobSpawner = {
         end
         return false
     end,
-    forceDisabled = function()
+    forceDisable = function()
         if not mobSpawner.uiState.alive then
             return nil, nil
         end
@@ -185,12 +185,12 @@ mobSpawner = {
     onStart = function()
         local isOpen = mobSpawner.ping()
         if isOpen then
-            mobSpawnerAlive = true
-            getState()
-            getSettings()
+            mobSpawner.uiState.alive = true
+            mobSpawner.getState()
+            mobSpawner.getSettings()
             progState.repaint = true
         else
-            mobSpawnerAlive   = false
+            mobSpawner.uiState.alive = false
             progState.repaint = true
         end
         mobSpawner.uiState.requestTimerID = os.startTimer(1)
@@ -206,7 +206,7 @@ mobSpawner = {
         end
 
         -- Draw settings button
-        paintutils.drawBox(17, 1, 26, 3, colors.white)
+        paintutils.drawBox(17, 1, 26, 3, colors.lightGray)
         paintutils.drawLine(18, 2, 25, 2, colors.black)
         term.setCursorPos(18, 2)
         if mobSpawner.uiState.inSettings then
@@ -249,8 +249,10 @@ mobSpawner = {
                 term.setCursorBlink(false)
             end
         else
+            term.setCursorBlink(false)
+
             -- Draw enabled state
-            paintutils.drawBox(1, 1, 13, 3, colors.white)
+            paintutils.drawBox(1, 1, 13, 3, colors.lightGray)
             if mobSpawner.state.enabled then
                 paintutils.drawLine(2, 2, 12, 2, colors.lime)
                 term.setCursorPos(6, 2)
@@ -264,7 +266,7 @@ mobSpawner = {
             end
 
             -- Draw forced state
-            paintutils.drawBox(1, 5, 13, 7, colors.white)
+            paintutils.drawBox(1, 5, 13, 7, colors.lightGray)
             if mobSpawner.settings.forced then
                 if mobSpawner.settings.enabled then
                     paintutils.drawLine(2, 6, 12, 6, colors.lime)
@@ -285,7 +287,7 @@ mobSpawner = {
             end
 
             -- Draw player state
-            paintutils.drawBox(1, 9, 17, 11, colors.white)
+            paintutils.drawBox(1, 9, 17, 11, colors.lightGray)
             if mobSpawner.state.playerOnline then
                 paintutils.drawLine(2, 10, 16, 10, colors.lime)
                 term.setCursorPos(2, 10)
@@ -304,12 +306,12 @@ mobSpawner = {
             if eventData[2] == mobSpawner.uiState.requestTimerID then
                 local isOpen = mobSpawner.ping()
                 if isOpen then
-                    mobSpawnerAlive = true
-                    getState()
-                    getSettings()
+                    mobSpawner.uiState.alive = true
+                    mobSpawner.getState()
+                    mobSpawner.getSettings()
                     progState.repaint = true
                 else
-                    mobSpawnerAlive   = false
+                    mobSpawner.uiState.alive = false
                     progState.repaint = true
                 end
                 mobSpawner.uiState.requestTimerID = os.startTimer(1)
@@ -319,6 +321,18 @@ mobSpawner = {
 
             -- Settings button
             if eventData[3] >= 17 and eventData[3] <= 26 and eventData[4] >= 1 and eventData[4] <= 3 then
+                if mobSpawner.uiState.inSettings and mobSpawner.uiState.selectedTextField ~= nil then
+                    if mobSpawner.uiState.selectedTextField == "playername" then
+                        mobSpawner.setPlayerName(mobSpawner.uiState.curText)
+                    elseif mobSpawner.uiState.selectedTextField == "channel" then
+                        mobSpawner.setChannel(tonumber(mobSpawner.uiState.curText))
+                    end
+                    mobSpawner.uiState.selectedTextField = nil
+                    mobSpawner.uiState.curText           = ""
+                    mobSpawner.uiState.cursorPos         = 0
+                    mobSpawner.uiState.viewPos           = 0
+                    progState.repaint                    = true
+                end
                 mobSpawner.uiState.inSettings = not mobSpawner.uiState.inSettings
                 progState.repaint = true
             elseif not mobSpawner.uiState.inSettings then
@@ -338,21 +352,21 @@ mobSpawner = {
                 if eventData[3] >= 1 and eventData[3] <= 15 then
                     if eventData[4] == 2 then
                         if mobSpawner.uiState.selectedTextField == "playername" then
-                            mobSpawner.uiState.cursorPos = mobSpawner.uiState.viewPos + math.max(math.min(eventData[3], #mobSpawner.uiState.curText) - 1, 0)
+                            mobSpawner.uiState.cursorPos = mobSpawner.uiState.viewPos + math.max(math.min(eventData[3], 1 + #mobSpawner.uiState.curText - mobSpawner.uiState.viewPos) - 1, 0)
                         else
                             mobSpawner.uiState.selectedTextField = "playername"
                             mobSpawner.uiState.curText           = mobSpawner.settings.playerName
-                            mobSpawner.uiState.cursorPos         = math.max(math.min(eventData[3], #mobSpawner.uiState.curText) - 1, 0)
+                            mobSpawner.uiState.cursorPos         = math.max(math.min(eventData[3], #mobSpawner.uiState.curText + 1) - 1, 0)
                             mobSpawner.uiState.viewPos           = 0
                         end
                         term.setCursorPos(1 + mobSpawner.uiState.cursorPos - mobSpawner.uiState.viewPos, 2)
                     elseif eventData[4] == 5 then
                         if mobSpawner.uiState.selectedTextField == "channel" then
-                            mobSpawner.uiState.cursorPos = mobSpawner.uiState.viewPos + math.max(math.min(eventData[3], #mobSpawner.uiState.curText) - 1, 0)
+                            mobSpawner.uiState.cursorPos = mobSpawner.uiState.viewPos + math.max(math.min(eventData[3], 1 + #mobSpawner.uiState.curText - mobSpawner.uiState.viewPos) - 1, 0)
                         else
                             mobSpawner.uiState.selectedTextField = "channel"
                             mobSpawner.uiState.curText           = tostring(progSettings.mobSpawnerChannel)
-                            mobSpawner.uiState.cursorPos         = math.max(math.min(eventData[3], #mobSpawner.uiState.curText) - 1, 0)
+                            mobSpawner.uiState.cursorPos         = math.max(math.min(eventData[3], #mobSpawner.uiState.curText + 1) - 1, 0)
                             mobSpawner.uiState.viewPos           = 0
                         end
                         term.setCursorPos(1 + mobSpawner.uiState.cursorPos - mobSpawner.uiState.viewPos, 5)
@@ -447,7 +461,7 @@ mobSpawner = {
 }
 
 function drawFooter()
-    paintutils.drawLine(1, 19, 26, 19, colors.white)
+    paintutils.drawLine(1, 19, 26, 19, colors.lightGray)
     term.setCursorPos(1, 20)
     term.setBackgroundColor(colors.black)
     term.clearLine()
@@ -458,7 +472,7 @@ function drawFooter()
         term.setTextColor(colors.white)
     end
     term.write(" Mob ")
-    paintutils.drawPixel(6, 20, colors.white)
+    paintutils.drawPixel(6, 20, colors.lightGray)
 end
 
 term.setBackgroundColor(colors.black)
